@@ -1,0 +1,34 @@
+name: uptime
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Public endpoints answer
+        shell: bash
+        run: |
+          fail=0
+          check() {
+            local url=$1 want=$2 code=000
+            for i in 1 2 3; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' -m 20 -A 'cherum-uptime/1' "$url" || true)
+              if [[ "$code" =~ $want ]]; then echo "ok   $code $url"; return 0; fi
+              echo "try $i: $code $url"; sleep 20
+            done
+            echo "::error title=Down::$url answered $code three times in a row"
+            return 1
+          }
+          check https://cherum.io/                '^200$' || fail=1
+          check https://app.cherum.io/en/swap     '^200$' || fail=1
+          check https://app.cherum.io/api/chains  '^200$' || fail=1
+          check https://pay.cherum.io/            '^(200|30[12])$' || fail=1
+          check https://dashboard.cherum.io/      '^200$' || fail=1
+          check https://docs.cherum.io/           '^200$' || fail=1
+          check https://claim.cherum.io/          '^200$' || fail=1
+          exit $fail
